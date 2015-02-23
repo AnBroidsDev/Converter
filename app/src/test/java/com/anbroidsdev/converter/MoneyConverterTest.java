@@ -7,9 +7,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 
+import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 public class MoneyConverterTest {
 
@@ -23,6 +23,8 @@ public class MoneyConverterTest {
     static {
         RATES = new HashMap<>();
         RATES.put("EUR", 0.879689294);
+        RATES.put("GBP", 0.656183);
+        RATES.put("JPY", 120.171);
     }
 
     private MoneyConverter moneyConverter;
@@ -73,7 +75,7 @@ public class MoneyConverterTest {
     }
 
     @Test
-    public void shouldConvertRadomNumber() throws Exception {
+    public void shouldConvertRandomNumber() throws Exception {
         double amount = new Random().nextDouble();
         double convertedAmount = moneyConverter.convert(amount, "EUR");
 
@@ -97,7 +99,11 @@ public class MoneyConverterTest {
         assertFalse(RATES.containsKey("EUR"));
         assertTrue(RATES.containsKey("USD"));
         assertEquals(1.0 / 0.879689294, RATES.get("USD"), 0);
+        assertEquals(0.656183 / 0.879689294, RATES.get("GBP"), 0);
+        assertEquals(120.171 / 0.879689294, RATES.get("JPY"), 0);
     }
+
+
 
     @Test(expected = IllegalArgumentException.class)
     public void shouldThrowExceptionIfBaseCurrencyIsNotSupported() throws Exception {

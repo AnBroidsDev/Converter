@@ -3,9 +3,11 @@ package com.anbroidsdev.converter;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.Currency;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
-import java.util.Random;
+import java.util.Set;
 
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
@@ -16,37 +18,31 @@ public class MoneyConverterTest {
     /**
      * Code corresponding to <a href="http://en.wikipedia.org/wiki/ISO_4217">ISO 4217</a>
      */
-    private static final String BASE = "USD";
+    private static final Currency BASE = Currency.getInstance("USD");
 
-    private static final Map<String, Double> RATES;
+    private static final Map<Currency, Double> RATES = new HashMap<>();
 
     static {
-        RATES = new HashMap<>();
-        RATES.put("EUR", 0.879689294);
-        RATES.put("GBP", 0.656183);
-        RATES.put("JPY", 120.171);
+        RATES.put(Currency.getInstance("EUR"), 0.879689294);
+        RATES.put(Currency.getInstance("GBP"), 0.656183);
+        RATES.put(Currency.getInstance("JPY"), 120.171);
     }
+
+    private static final Double[] AMOUNTS = new Double[]{-2.0,
+                                                         -1.0,
+                                                         1.0,
+                                                         2.0};
 
     private MoneyConverter moneyConverter;
 
     @Before
     public void setUp() throws Exception {
-        moneyConverter = new MoneyConverter(BASE, RATES);
+        moneyConverter = new MoneyConverter(BASE, new HashMap<>(RATES));
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void shouldThrowExceptionIfBaseIsNull() throws Exception {
         new MoneyConverter(null, RATES);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void shouldThrowExceptionIfBaseIsEmpty() throws Exception {
-        new MoneyConverter("", RATES);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void shouldThrowExceptionIfBaseIsNotAValidCurrencyCode() throws Exception {
-        new MoneyConverter("NO_VALID", RATES);
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -56,58 +52,103 @@ public class MoneyConverterTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void shouldThrowExceptionIfRatesAreEmpty() throws Exception {
-        new MoneyConverter(BASE, new HashMap<String, Double>());
+        new MoneyConverter(BASE, new HashMap<Currency, Double>());
     }
 
     @Test(expected = IllegalArgumentException.class)
-    public void shouldThrowExceptionIfRatesContainsAnyNotValidCurrencyCode() throws Exception {
-        final Map<String, Double> rates = new HashMap<>();
-        rates.put("NO_VALID", 0.879689294);
+    public void shouldThrowExceptionIfRatesHaveAnyNullValue() throws Exception {
+        final Map<Currency, Double> rates = new HashMap<>();
+        rates.put(Currency.getInstance("EUR"), null);
 
         new MoneyConverter(BASE, rates);
     }
 
     @Test
-    public void shouldConvertBaseCase() throws Exception {
-        double convertedAmount = moneyConverter.convert(1, "EUR");
+    public void shouldConvertAmountToAGivenCurrencyWithDefaultBase() throws Exception {
+        for (Map.Entry<Currency, Double> entry : RATES.entrySet()) {
+            for (Double amount : AMOUNTS) {
+                final double convertedAmount = moneyConverter.convert(moneyConverter.convert(amount, entry.getKey()),
+                                                                      BASE,
+                                                                      entry.getKey());
 
-        assertEquals(RATES.get("EUR"), convertedAmount, 0);
+                // Converting twice should return the original amount
+                assertEquals(amount, convertedAmount, 0.000000000000001);
+            }
+        }
     }
 
     @Test
-    public void shouldConvertRandomNumber() throws Exception {
-        double amount = new Random().nextDouble();
-        double convertedAmount = moneyConverter.convert(amount, "EUR");
+    public void shouldConvertAmountToAGivenCurrencyWithCustomBase() throws Exception {
+        final Set<Currency> currencies = new HashSet<>();
+        currencies.add(BASE);
+        currencies.addAll(RATES.keySet());
 
-        assertEquals(RATES.get("EUR") * amount, convertedAmount, 0);
-    }
+        for (Currency currency : currencies) {
+            for (Currency base : currencies) {
+                if (currency != base) {
+                    for (Double amount : AMOUNTS) {
+                        final double convertedAmount = moneyConverter.convert(moneyConverter.convert(amount, currency, base),
+                                                                              base,
+                                                                              currency);
 
-    @Test(expected = IllegalArgumentException.class)
-    public void shouldThrowExceptionIfAmountIsNegative() throws Exception {
-        moneyConverter.convert(-1, "EUR");
+                        // Converting twice should return the original amount
+                        assertEquals(amount, convertedAmount, 0.000000000000001);
+                    }
+                }
+            }
+        }
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void shouldThrowExceptionIfOutputCurrencyIsNotSupported() throws Exception {
-        moneyConverter.convert(1, "ARS");
+        moneyConverter.convert(1, Currency.getInstance("ARS"));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void shouldThrowExceptionIfCustomBaseIsNotSupported() throws Exception {
+        moneyConverter.convert(1, Currency.getInstance("EUR"), Currency.getInstance("ARS"));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void shouldThrowExceptionIfOutputCurrencyAndCustomBaseAreTheSame() throws Exception {
+        moneyConverter.convert(1, BASE, BASE);
+    }
+
+    @Test
+    public void shouldChangeBase() throws Exception {
+        final Currency newBaseCurrency = Currency.getInstance("EUR");
+
+        moneyConverter.setBase(newBaseCurrency);
+
+        assertEquals(newBaseCurrency, moneyConverter.getBase());
     }
 
     @Test
     public void shouldUpdateRatesWhenBaseIsChanged() throws Exception {
-        moneyConverter.setBase("EUR");
+        final Currency baseCurrency = Currency.getInstance("USD");
+        final Currency newBaseCurrency = Currency.getInstance("EUR");
 
-        assertFalse(RATES.containsKey("EUR"));
-        assertTrue(RATES.containsKey("USD"));
-        assertEquals(1.0 / 0.879689294, RATES.get("USD"), 0);
-        assertEquals(0.656183 / 0.879689294, RATES.get("GBP"), 0);
-        assertEquals(120.171 / 0.879689294, RATES.get("JPY"), 0);
+        moneyConverter.setBase(newBaseCurrency);
+
+        double inverseRate = 1.0 / RATES.get(newBaseCurrency);
+
+        assertFalse(moneyConverter.getRates().containsKey(newBaseCurrency));
+        assertTrue(moneyConverter.getRates().containsKey(baseCurrency));
+        assertEquals(inverseRate, moneyConverter.getRates().get(baseCurrency), 0);
+
+        final Map<Currency, Double> rates = new HashMap<>(moneyConverter.getRates());
+        rates.remove(newBaseCurrency);
+
+        for (Map.Entry<Currency, Double> entry : rates.entrySet()) {
+            if (entry.getKey() != baseCurrency) {
+                assertEquals(inverseRate * RATES.get(entry.getKey()), entry.getValue(), 0);
+            }
+        }
     }
 
-
-
     @Test(expected = IllegalArgumentException.class)
-    public void shouldThrowExceptionIfBaseCurrencyIsNotSupported() throws Exception {
-        moneyConverter.setBase("ARS");
+    public void shouldThrowExceptionIfNewBaseCurrencyIsNotSupported() throws Exception {
+        moneyConverter.setBase(Currency.getInstance("ARS"));
     }
 
 }

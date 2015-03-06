@@ -1,6 +1,6 @@
 package com.anbroidsdev.converter;
 
-import java.util.Arrays;
+import java.util.Currency;
 import java.util.Map;
 
 /**
@@ -8,98 +8,81 @@ import java.util.Map;
  */
 public class MoneyConverter {
 
-    private static final int CURRENCY_CODE_LENGTH = 3;
-    private static final String[] SUPPORTED_CURRENCY_CODES = {
-            "EUR",
-            "USD",
-            "GBP",
-            "JPY",
-    };
-    private String base;
-    private Map<String,Double> rates;
+    private Currency base;
+    private final Map<Currency, Double> rates;
 
-    public MoneyConverter(String base, Map<String, Double> rates) {
+    public MoneyConverter(Currency base, Map<Currency, Double> rates) {
+        if (base == null) {
+            throw new IllegalArgumentException("Base cannot be null");
+        }
 
-        if (base == null || base.isEmpty())
-            throw new IllegalArgumentException("Base can not be null or empty");
+        if (rates == null || rates.isEmpty()) {
+            throw new IllegalArgumentException("Rates cannot be null or empty");
+        }
 
-        if (!isValidCurrencyCode(base))
-            throw new IllegalArgumentException("Invalid Base currency code");
-
-        if (rates == null || rates.isEmpty())
-            throw new IllegalArgumentException("Rates can no be null or empty");
-
-        if (!isValidCurrencyCodes(rates))
-            throw new IllegalArgumentException("At least one currency is not valid in Rates");
+        for (Map.Entry<Currency, Double> entry : rates.entrySet()) {
+            if (entry.getValue() == null) {
+                throw new IllegalArgumentException("Rates cannot have any null value");
+            }
+        }
 
         this.base = base;
         this.rates = rates;
     }
 
-
-
-    public void setBase(String newBase) {
-
-        if (!isValidCurrencyCode(newBase)){
-            throw new IllegalArgumentException("Base conversion is not valid");
-        }
-        if (!isSupportedCurrencyCode(newBase)){
-            throw new IllegalArgumentException("Base conversion is not supported");
+    public void setBase(Currency currency) {
+        if (!rates.containsKey(currency)) {
+            throw new IllegalArgumentException("Currency is not supported");
         }
 
-        Double value = rates.get(newBase);
+        final Double inverseRate = 1.0 / rates.get(currency);
 
-        if (value == null)
-            throw new IllegalArgumentException("Rate not available");
+        rates.remove(currency);
 
-        for (String currency : rates.keySet()){
-            rates.put(currency,rates.get(currency)/value);
+        for (Map.Entry<Currency, Double> entry : rates.entrySet()) {
+            entry.setValue(inverseRate * entry.getValue());
         }
 
-        rates.put(this.base,1.0/value);
-        rates.remove(newBase);
+        rates.put(base, inverseRate);
 
-        this.base = newBase;
+        base = currency;
     }
 
-    public double convert(double amount,String currency){
-
-        if (amount < 0)
-            throw new IllegalArgumentException("Amount to convert must be greater than 0");
-
-        if (!isValidCurrencyCode(currency))
-            throw new IllegalArgumentException("Currency code is not valid");
-
-        if (!isSupportedCurrencyCode(currency))
-            throw new IllegalArgumentException("Currency code is not supported");
-
-        double convertedValue = rates.get(currency) * amount;
-
-        return convertedValue;
+    public Currency getBase() {
+        return base;
     }
 
-    private boolean isValidCurrencyCode(String code){
-
-        if (code == null || code.length() != CURRENCY_CODE_LENGTH)
-            return false;
-
-        return true;
+    public Map<Currency, Double> getRates() {
+        return rates;
     }
 
-    private boolean isSupportedCurrencyCode(String code){
-
-        if (code == null || !Arrays.asList(SUPPORTED_CURRENCY_CODES).contains(code))
-            return false;
-
-        return true;
+    public double convert(double amount, Currency currency) {
+        return convert(amount, currency, base);
     }
 
-    private boolean isValidCurrencyCodes(Map<String, Double> rates) {
-
-        for (String key : rates.keySet()){
-            if (!isValidCurrencyCode(key))
-                return false;
+    public double convert(double amount, Currency currency, Currency base) {
+        if (!rates.containsKey(currency) && currency != this.base) {
+            throw new IllegalArgumentException("Currency is not supported");
         }
-        return true;
+
+        if (!rates.containsKey(base) && base != this.base) {
+            throw new IllegalArgumentException("Base is not supported");
+        }
+
+        if (currency == base) {
+            throw new IllegalArgumentException("Currency and Base cannot be the same");
+        }
+
+        final Double rate;
+        if (currency == this.base) {
+            rate = 1.0 / rates.get(base);
+        } else if (base == this.base) {
+            rate = rates.get(currency);
+        } else {
+            rate = 1.0 / rates.get(base) * rates.get(currency);
+        }
+
+        return rate * amount;
     }
+
 }

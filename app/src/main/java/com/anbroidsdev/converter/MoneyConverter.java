@@ -9,47 +9,45 @@ import java.util.Map;
 public class MoneyConverter {
 
     private Currency base;
-    private final Map<Currency, Double> rates;
+    private Map<Currency, Double> rates;
 
     public MoneyConverter(Currency base, Map<Currency, Double> rates) {
+        setBase(base);
+        setRates(rates);
+    }
+
+    public void setBase(Currency base) {
         if (base == null) {
             throw new IllegalArgumentException("Base cannot be null");
         }
 
-        if (rates == null || rates.isEmpty()) {
-            throw new IllegalArgumentException("Rates cannot be null or empty");
-        }
-
-        for (Map.Entry<Currency, Double> entry : rates.entrySet()) {
-            if (entry.getValue() == null) {
-                throw new IllegalArgumentException("Rates cannot have any null value");
+        if (rates != null) {
+            if (!rates.containsKey(base)) {
+                throw new IllegalArgumentException("Currency is not supported");
             }
+
+            final Double inverseRate = 1.0 / rates.get(base);
+
+            rates.remove(base);
+
+            for (Map.Entry<Currency, Double> entry : rates.entrySet()) {
+                entry.setValue(inverseRate * entry.getValue());
+            }
+
+            rates.put(this.base, inverseRate);
         }
 
         this.base = base;
-        this.rates = rates;
-    }
-
-    public void setBase(Currency currency) {
-        if (!rates.containsKey(currency)) {
-            throw new IllegalArgumentException("Currency is not supported");
-        }
-
-        final Double inverseRate = 1.0 / rates.get(currency);
-
-        rates.remove(currency);
-
-        for (Map.Entry<Currency, Double> entry : rates.entrySet()) {
-            entry.setValue(inverseRate * entry.getValue());
-        }
-
-        rates.put(base, inverseRate);
-
-        base = currency;
     }
 
     public Currency getBase() {
         return base;
+    }
+
+    public void setRates(Map<Currency, Double> rates) {
+        checkRates(rates);
+
+        this.rates = rates;
     }
 
     public Map<Currency, Double> getRates() {
@@ -83,6 +81,26 @@ public class MoneyConverter {
         }
 
         return rate * amount;
+    }
+
+    private void checkRates(Map<Currency, Double> rates) {
+        if (rates == null || rates.isEmpty()) {
+            throw new IllegalArgumentException("Rates cannot be null or empty");
+        }
+
+        if (base != null && rates.containsKey(base)) {
+            throw new IllegalArgumentException("Rates cannot contain the Base currency");
+        }
+
+        for (Map.Entry<Currency, Double> entry : rates.entrySet()) {
+            if (entry.getValue() == null) {
+                throw new IllegalArgumentException("Rates cannot have any null value");
+            }
+
+            if (entry.getValue() < 0) {
+                throw new IllegalArgumentException("Rates cannot have any negative value");
+            }
+        }
     }
 
 }

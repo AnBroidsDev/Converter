@@ -21,7 +21,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
-public class MoneyConverterRatesUpdaterTest {
+public class RatesUpdaterTest {
 
     private static final Currency BASE = Currency.getInstance("USD");
     private static final Map<String, Double> RATES = new HashMap<>();
@@ -30,25 +30,38 @@ public class MoneyConverterRatesUpdaterTest {
         RATES.put("GBP", 0.656183);
         RATES.put("JPY", 120.171);
     }
+    private static final Rates CONVERTED_RATES = new Rates(RATES);
     private static final long TIMESTAMP = 1425916861;
 
     @Mock
     private MoneyConverter moneyConverter;
     @Mock
     private OpenExchangeRatesApi openExchangeRatesApi;
+    @Mock
+    private SharedPreferencesRatesSaver ratesSaver;
     @InjectMocks
-    private MoneyConverterRatesUpdater moneyConverterRatesUpdater;
+    private RatesUpdater ratesUpdater;
 
     @Mock
-    private MoneyConverterRatesUpdater.OnRatesUpdateListener listener;
+    private RatesUpdater.OnRatesUpdateListener listener;
 
     @Test
     public void shouldGetLatestRatesFromOpenExchangeRates() throws Exception {
         prepareMoneyConverter();
 
-        moneyConverterRatesUpdater.updateRates(listener);
+        ratesUpdater.updateRates(listener);
 
         verify(openExchangeRatesApi).getLatestRates(eq(BASE.getCurrencyCode()), any(OpenExchangeRatesApi.OnLatestRatesCallback.class));
+    }
+
+    @Test
+    public void shouldSaveTheRetrievedRates() throws Exception {
+        prepareMoneyConverter();
+        prepareOnLatestRatesCallback();
+
+        ratesUpdater.updateRates(listener);
+
+        verify(ratesSaver, times(1)).saveRates(eq(CONVERTED_RATES), eq(TIMESTAMP));
     }
 
     @Test
@@ -56,9 +69,9 @@ public class MoneyConverterRatesUpdaterTest {
         prepareMoneyConverter();
         prepareOnLatestRatesCallback();
 
-        moneyConverterRatesUpdater.updateRates(listener);
+        ratesUpdater.updateRates(listener);
 
-        verify(moneyConverter, times(1)).setRates(eq(convertRates(RATES)));
+        verify(moneyConverter, times(1)).setRates(eq(CONVERTED_RATES));
     }
 
     @Test
@@ -68,9 +81,9 @@ public class MoneyConverterRatesUpdaterTest {
 
         RATES.put("WRONG", 0.43672);
 
-        moneyConverterRatesUpdater.updateRates(listener);
+        ratesUpdater.updateRates(listener);
 
-        verify(moneyConverter, times(1)).setRates(eq(convertRates(RATES)));
+        verify(moneyConverter, times(1)).setRates(eq(CONVERTED_RATES));
 
         RATES.remove("WRONG");
     }
@@ -80,9 +93,9 @@ public class MoneyConverterRatesUpdaterTest {
         prepareMoneyConverter();
         prepareOnLatestRatesCallback();
 
-        moneyConverterRatesUpdater.updateRates(listener);
+        ratesUpdater.updateRates(listener);
 
-        verify(listener).onRatesUpdated(eq(convertRates(RATES)), eq(TIMESTAMP));
+        verify(listener).onRatesUpdated();
     }
 
     private void prepareMoneyConverter() {
@@ -97,18 +110,6 @@ public class MoneyConverterRatesUpdaterTest {
                 return null;
             }
         }).when(openExchangeRatesApi).getLatestRates(anyString(), any(OpenExchangeRatesApi.OnLatestRatesCallback.class));
-    }
-
-    private static Map<Currency, Double> convertRates(Map<String, Double> rates) {
-        final Map<Currency, Double> expectedRates = new HashMap<>(rates.size());
-
-        for (Map.Entry<String, Double> rate : rates.entrySet()) {
-            try {
-                expectedRates.put(Currency.getInstance(rate.getKey()), rate.getValue());
-            } catch (IllegalArgumentException e) {}
-        }
-
-        return expectedRates;
     }
 
 }

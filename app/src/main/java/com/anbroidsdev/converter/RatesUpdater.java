@@ -1,23 +1,23 @@
 package com.anbroidsdev.converter;
 
-import java.util.Currency;
-import java.util.HashMap;
 import java.util.Map;
 
-public class MoneyConverterRatesUpdater {
+public class RatesUpdater {
 
     public interface OnRatesUpdateListener {
 
-        public void onRatesUpdated(Map<Currency, Double> rates, long timestamp);
+        public void onRatesUpdated();
 
     }
 
     private final MoneyConverter moneyConverter;
     private final OpenExchangeRatesApi openExchangeRatesApi;
+    private final RatesSaver ratesSaver;
 
-    public MoneyConverterRatesUpdater(MoneyConverter moneyConverter, OpenExchangeRatesApi openExchangeRatesApi) {
+    public RatesUpdater(MoneyConverter moneyConverter, OpenExchangeRatesApi openExchangeRatesApi, RatesSaver ratesSaver) {
         this.moneyConverter = moneyConverter;
         this.openExchangeRatesApi = openExchangeRatesApi;
+        this.ratesSaver = ratesSaver;
     }
 
     public void updateRates(final OnRatesUpdateListener listener) {
@@ -25,18 +25,14 @@ public class MoneyConverterRatesUpdater {
 
             @Override
             public void onLatestRates(Map<String, Double> rates, long timestamp) {
-                final Map<Currency, Double> newRates = new HashMap<>(rates.size());
+                final Rates newRates = new Rates(rates);
 
-                for (Map.Entry<String, Double> rate : rates.entrySet()) {
-                    try {
-                        newRates.put(Currency.getInstance(rate.getKey()), rate.getValue());
-                    } catch (IllegalArgumentException e) {}
-                }
+                ratesSaver.saveRates(newRates, timestamp);
 
                 moneyConverter.setRates(newRates);
 
                 if (listener != null) {
-                    listener.onRatesUpdated(newRates, timestamp);
+                    listener.onRatesUpdated();
                 }
             }
 

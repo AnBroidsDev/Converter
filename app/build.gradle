@@ -7,6 +7,10 @@ buildscript {
     }
 }
 
+repositories {
+    maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
+}
+
 apply plugin: 'com.android.application'
 apply plugin: 'com.neenbedankt.android-apt'
 
@@ -45,6 +49,6 @@ dependencies {
     apt 'com.google.dagger:dagger-compiler:2.0'
     provided 'javax.annotation:jsr250-api:1.0'
 
-    testCompile "junit:junit:4.12"
-    testCompile "org.mockito:mockito-core:1.9.5"
+    testCompile 'junit:junit:4.12'
+    testCompile 'org.mockito:mockito-core:1.9.5'
 }

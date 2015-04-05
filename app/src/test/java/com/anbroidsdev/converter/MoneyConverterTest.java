@@ -3,11 +3,9 @@ package com.anbroidsdev.converter;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Currency;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.List;
 
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
@@ -20,12 +18,12 @@ public class MoneyConverterTest {
      */
     private static final Currency BASE = Currency.getInstance("USD");
 
-    private static final Map<Currency, Double> RATES = new HashMap<>();
+    private static final Rates RATES = new Rates();
 
     static {
-        RATES.put(Currency.getInstance("EUR"), 0.879689294);
-        RATES.put(Currency.getInstance("GBP"), 0.656183);
-        RATES.put(Currency.getInstance("JPY"), 120.171);
+        RATES.put(new Rate(Currency.getInstance("EUR"), 0.879689294));
+        RATES.put(new Rate(Currency.getInstance("GBP"), 0.656183));
+        RATES.put(new Rate(Currency.getInstance("JPY"), 120.171));
     }
 
     private static final Double[] AMOUNTS = new Double[]{-2.0,
@@ -37,7 +35,7 @@ public class MoneyConverterTest {
 
     @Before
     public void setUp() throws Exception {
-        moneyConverter = new MoneyConverter(BASE, new HashMap<>(RATES));
+        moneyConverter = new MoneyConverter(BASE, RATES.copy());
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -52,61 +50,45 @@ public class MoneyConverterTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void shouldThrowExceptionIfRatesAreEmpty() throws Exception {
-        new MoneyConverter(BASE, new HashMap<Currency, Double>());
+        new MoneyConverter(BASE, new Rates());
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void shouldThrowExceptionIfRatesHasAnyNullValue() throws Exception {
         final Currency key = Currency.getInstance("EUR");
-        final Double value = RATES.get(key);
+        final Rates rates = RATES.copy();
 
-        RATES.put(key, null);
+        rates.put(new Rate(key, null));
 
-        try {
-            new MoneyConverter(BASE, RATES);
-        } catch (IllegalArgumentException e) {
-            RATES.put(key, value);
-
-            throw e;
-        }
+        new MoneyConverter(BASE, rates);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void shouldThrowExceptionIfRatesHasAnyNegativeValue() throws Exception {
         final Currency key = Currency.getInstance("EUR");
-        final Double value = RATES.get(key);
+        final Rates rates = RATES.copy();
+        final Double value = rates.get(key).getValue();
 
-        RATES.put(key, -value);
+        rates.put(new Rate(key, -value));
 
-        try {
-            new MoneyConverter(BASE, RATES);
-        } catch (IllegalArgumentException e) {
-            RATES.put(key, value);
-
-            throw e;
-        }
+        new MoneyConverter(BASE, rates);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void shouldThrowExceptionIfRatesContainsTheBase() throws Exception {
-        RATES.put(BASE, null);
+        final Rates rates = RATES.copy();
+        rates.put(new Rate(BASE, null));
 
-        try {
-            new MoneyConverter(BASE, RATES);
-        } catch (IllegalArgumentException e) {
-            RATES.remove(BASE);
-
-            throw e;
-        }
+        new MoneyConverter(BASE, rates);
     }
 
     @Test
     public void shouldConvertAmountToAGivenCurrencyWithDefaultBase() throws Exception {
-        for (Map.Entry<Currency, Double> entry : RATES.entrySet()) {
+        for (Rate rate : RATES.list()) {
             for (Double amount : AMOUNTS) {
-                final double convertedAmount = moneyConverter.convert(moneyConverter.convert(amount, entry.getKey()),
+                final double convertedAmount = moneyConverter.convert(moneyConverter.convert(amount, rate.getCurrency()),
                                                                       BASE,
-                                                                      entry.getKey());
+                                                                      rate.getCurrency());
 
                 // Converting twice should return the original amount
                 assertEquals(amount, convertedAmount, 0.000000000000001);
@@ -116,9 +98,11 @@ public class MoneyConverterTest {
 
     @Test
     public void shouldConvertAmountToAGivenCurrencyWithCustomBase() throws Exception {
-        final Set<Currency> currencies = new HashSet<>();
+        final List<Currency> currencies = new ArrayList<>();
         currencies.add(BASE);
-        currencies.addAll(RATES.keySet());
+        for (Rate rate : RATES.list()) {
+            currencies.add(rate.getCurrency());
+        }
 
         for (Currency currency : currencies) {
             for (Currency base : currencies) {
@@ -167,18 +151,15 @@ public class MoneyConverterTest {
 
         moneyConverter.setBase(newBaseCurrency);
 
-        double inverseRate = 1.0 / RATES.get(newBaseCurrency);
+        double inverseRate = 1.0 / RATES.get(newBaseCurrency).getValue();
 
-        assertFalse(moneyConverter.getRates().containsKey(newBaseCurrency));
-        assertTrue(moneyConverter.getRates().containsKey(baseCurrency));
-        assertEquals(inverseRate, moneyConverter.getRates().get(baseCurrency), 0);
+        assertFalse(moneyConverter.getRates().containsCurrency(newBaseCurrency));
+        assertTrue(moneyConverter.getRates().containsCurrency(baseCurrency));
+        assertEquals(inverseRate, moneyConverter.getRates().get(baseCurrency).getValue(), 0);
 
-        final Map<Currency, Double> rates = new HashMap<>(moneyConverter.getRates());
-        rates.remove(newBaseCurrency);
-
-        for (Map.Entry<Currency, Double> entry : rates.entrySet()) {
-            if (entry.getKey() != baseCurrency) {
-                assertEquals(inverseRate * RATES.get(entry.getKey()), entry.getValue(), 0);
+        for (Rate rate : moneyConverter.getRates().list()) {
+            if (rate.getCurrency() != baseCurrency) {
+                assertEquals(inverseRate * RATES.get(rate.getCurrency()).getValue(), rate.getValue(), 0);
             }
         }
     }

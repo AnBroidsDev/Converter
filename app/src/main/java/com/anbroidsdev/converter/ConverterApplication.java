@@ -26,11 +26,6 @@ public class ConverterApplication extends Application {
         component.inject(this);
     }
 
-
-    public void inject(MainActivity activity) {
-        component.inject(activity);
-    }
-
     public RootComponent getComponent() {
         return component;
     }

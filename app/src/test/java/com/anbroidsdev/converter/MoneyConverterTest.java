@@ -56,11 +56,48 @@ public class MoneyConverterTest {
     }
 
     @Test(expected = IllegalArgumentException.class)
-    public void shouldThrowExceptionIfRatesHaveAnyNullValue() throws Exception {
-        final Map<Currency, Double> rates = new HashMap<>();
-        rates.put(Currency.getInstance("EUR"), null);
+    public void shouldThrowExceptionIfRatesHasAnyNullValue() throws Exception {
+        final Currency key = Currency.getInstance("EUR");
+        final Double value = RATES.get(key);
 
-        new MoneyConverter(BASE, rates);
+        RATES.put(key, null);
+
+        try {
+            new MoneyConverter(BASE, RATES);
+        } catch (IllegalArgumentException e) {
+            RATES.put(key, value);
+
+            throw e;
+        }
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void shouldThrowExceptionIfRatesHasAnyNegativeValue() throws Exception {
+        final Currency key = Currency.getInstance("EUR");
+        final Double value = RATES.get(key);
+
+        RATES.put(key, -value);
+
+        try {
+            new MoneyConverter(BASE, RATES);
+        } catch (IllegalArgumentException e) {
+            RATES.put(key, value);
+
+            throw e;
+        }
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void shouldThrowExceptionIfRatesContainsTheBase() throws Exception {
+        RATES.put(BASE, null);
+
+        try {
+            new MoneyConverter(BASE, RATES);
+        } catch (IllegalArgumentException e) {
+            RATES.remove(BASE);
+
+            throw e;
+        }
     }
 
     @Test
@@ -144,6 +181,11 @@ public class MoneyConverterTest {
                 assertEquals(inverseRate * RATES.get(entry.getKey()), entry.getValue(), 0);
             }
         }
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void shouldThrowExceptionIfNewBaseCurrencyIsNull() throws Exception {
+        moneyConverter.setBase(null);
     }
 
     @Test(expected = IllegalArgumentException.class)
